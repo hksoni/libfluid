@@ -1,0 +1,180 @@
+#ifndef __MSGAPPS_HH__
+#define __MSGAPPS_HH__
+
+#include <iostream>
+#include <map>
+#include <set>
+#include <vector>
+#include <fluid/of10msg.hh>
+#include <fluid/of13msg.hh>
+#include "MCGroupMember.hh"
+
+#define ETH_HLEN 14
+#define ETH_TYPE_IP 0x0800
+#define PROTOCOL_TYPE_IGMP 0x02
+#define PROTOCOL_TYPE_UDP 0x11
+#define GROUP_JOIN_CODE_UDP "7070"
+#define GROUP_LEAVE_CODE_UDP "AEAE"
+
+using namespace fluid_msg;
+
+
+/* 
+ * MCGroup holds information to uniquely identify group.
+ * It needs destination class-D ip value as groupip.
+ * To support multicast without class-D IP, groupip and udpport should hold
+ * source IP and UDP port number. Only SSM is allowed in this case as of now.
+ */
+class MCGroup {
+public:
+    /* Create a new Multicast Group
+     *
+     * @param: ip: can either unicast source IP or class-D multicast destination
+     * ip
+     * @param: port: udp transport for application
+     * @param: up_intf: upstream interface for the group
+     * @param: ssm: true if source specific multicast group,  ip should be unicast source
+     * @param: ssm: false multicast class-D,  ip should be group D
+     */
+    MCGroup(uint32_t ip, uint16_t up_intf, uint16_t port, bool ssm) {
+        groupip_ = ip;
+        udpport_ = port;
+        upstream_intf_ = up_intf;
+        is_ssm_ = ssm;
+        groupid_ = ++OFMsgGroupIdGen;
+    }
+    
+    /*
+     * TODO: reminder, if ever introduce pointers in the class add copy constructor,
+     * destructor and also modified below.
+     */
+    MCGroup& operator=(const MCGroup& mtg) {
+        this->groupip_ = mtg.groupip_;  
+        this->udpport_ = mtg.udpport_;  
+        this->upstream_intf_  = mtg.upstream_intf_;  
+        this->is_ssm_ = mtg.is_ssm_;  
+        this->groupid_ = mtg.groupid_;
+        return *this;
+    }
+
+    /*
+     * less than operator is for std::map. MCGroup class is
+     * used as key in a std::map object.
+     */
+    bool operator<(const MCGroup& mtg) const {
+
+        if (is_ssm_ == mtg.is_ssm_ ) {
+            if (this->groupip_ != mtg.groupip_)
+                return (this->groupip_ < mtg.groupip_);
+            if (is_ssm_)
+                if (this->udpport_ != mtg.udpport_)
+                  return (this->udpport_ < mtg.udpport_);
+        } else {
+            return is_ssm_;
+        }
+    }
+
+    uint8_t* create_of13_group_table_msg(uint32_t xid) {
+        mggroupmod_.xid(xid);
+        mggroupmod_.commmand(of13::OFPGC_ADD);
+        mggroupmod_.group_type(of13::OFPGT_ALL);
+        mggroupmod_.group_id(this->groupid_);
+        return mggroupmod_.pack();
+    }
+
+    uint8_t* add_bucket_of13_group(uint32_t xid, MCGroupMember& mtmg) {
+        mggroupmod_.xid(xid);
+        mggroupmod_.commmand(of13::OFPGC_MODIFY);
+        of13::Bucket member_bucket;
+        uint64_t dmac = mtmg.dest_mac();
+        of10::SetDLDstAction setdlst((uint8_t*) (&dmac) + 2);
+        of10::SetNWDstAction setnwdst(IPAddress(mtmg.dest_ip()));
+        of10::SetTPDstAction settpdst(mtmg.udp_port());
+        of10::OutputAction outact(mtmg.intf(), 0);
+        member_bucket.add_action(settpdst);
+        member_bucket.add_action(setnwdst);
+        member_bucket.add_action(setdlst);
+        member_bucket.add_action(outact);
+        mggroupmod_.add_bucket(member_bucket);
+        mtmg.bucket_index(member_of13_buckets_.size());
+        member_of13_buckets_.push_back(member_bucket);
+        return mggroupmod_.pack();
+    }
+
+    uint8_t* remove_bucket_of13_group(uint32_t xid, MCGroupMember& mtmg) {
+        mggroupmod_.xid(xid);
+        mggroupmod_.commmand(of13::OFPGC_MODIFY);
+        uint8_t bi = mtmg.bucket_index();
+        if(member_of13_buckets_.size() <= bi) {
+          std::cout<< "Error:: " << __FUNCTION__ <<"\n";
+          return NULL;
+        }
+        member_of13_buckets_.erase(member_of13_buckets_.begin() + bi);
+        mggroupmod_.buckets(member_of13_buckets_);
+        return mggroupmod_.pack();
+    }
+
+    uint8_t* create_flow_mod_for_group() {
+        uint8_t* buffer;
+        mgflowmod_.xid(++OFMsgXidGen);
+        mgflowmod_.cookie(++OFMsgCookieGen);
+        mgflowmod_.cookie_mask(0xffffffffffffffff);
+        mgflowmod_.table_id(0);
+        mgflowmod_.command(of13::OFPFC_ADD);
+        //If both idle_timeout and hard_timeout are zero,
+        //then the flow is permanent and should not be deleted without an
+        //explicit deletion. Delete expliciTODO: set tly..
+        mgflowmod_.idle_timeout(0); 
+        mgflowmod_.hard_timeout(0);
+        
+        mgflowmod_.priority(100);
+        mgflowmod_.buffer_id(0xffffffff);
+        mgflowmod_.out_port(0);
+        mgflowmod_.out_group(0);
+        mgflowmod_.flags(of13::OFPFF_CHECK_OVERLAP);
+        
+        //For unicast source IP and UDP port match, 
+        //is_ssm_ should be true in this case
+        if (is_ssm_) {
+            of13::IPv4Src ipsrcm(IPAddress (this->groupip_));
+            of13::UDPSrc udpsrcm(this->udpport_);
+            mgflowmod_.add_oxm_field(ipsrcm);
+            mgflowmod_.add_oxm_field(udpsrcm);
+        } else { //group is using class-D ip for multicast
+            of13::IPv4Dst ipdstm(IPAddress (this->groupip_));
+            mgflowmod_.add_oxm_field(ipdstm);
+        }
+
+        of13::GroupAction groupact(this->groupid_);
+        of13::WriteActions inst;
+        inst.add_action(groupact);
+        mgflowmod_.add_instruction(inst);
+        buffer = mgflowmod_.pack();
+        return buffer;
+    }
+
+private:
+    uint32_t groupip_;
+    uint16_t udpport_;
+    uint16_t upstream_intf_;
+    bool is_ssm_;
+    uint32_t groupid_;
+
+    of13::FlowMod mgflowmod_;
+    of13::GroupMod mggroupmod_;
+
+    std::vector<of13::Bucket> member_of13_buckets_;
+
+    static uint32_t OFMsgXidGen;
+    static uint32_t OFMsgGroupIdGen;
+    static uint64_t OFMsgCookieGen;
+
+};
+
+
+uint32_t MCGroup::OFMsgXidGen = 0;
+uint32_t MCGroup::OFMsgGroupIdGen = 0;
+uint64_t MCGroup::OFMsgCookieGen = 0;
+
+
+#endif

@@ -118,10 +118,10 @@ public:
 
     Controller(const char* address = "0.0.0.0",
                const int port = 6653,
-               const int n_workers = 4,
+               const int n_workers = 2,
                bool secure = false) : 
-    OFServer(address, port, n_workers, secure, OFServerSettings().supported_version(1).
-                        supported_version(4).keep_data_ownership(false)) {
+    OFServer(address, port, n_workers, secure, OFServerSettings().supported_version(4).
+                              keep_data_ownership(false)) {
         this->running = true;
     }
 
