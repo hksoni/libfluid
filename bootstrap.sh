@@ -55,11 +55,11 @@ init_lib() {
     fi
     
     # Figure out the most recent patch version for the chosen minor release
-    TAG=`git describe --match "$RELEASE*" --tags --abbrev=0`
-    check "Tag not found for '$SUBMODULE' $RELEASE."
+    #TAG=`git describe --match "$RELEASE*" --tags --abbrev=0`
+    #check "Tag not found for '$SUBMODULE' $RELEASE."
     
-    echo "Checking out '$SUBMODULE' $RELEASE..."
-    git checkout tags/$TAG
+    #echo "Checking out '$SUBMODULE' $RELEASE..."
+    #git checkout tags/$TAG
     check "Error checking out '$SUBMODULE' $TAG."
     
     # Run autogen.sh (build autoconf tools)
