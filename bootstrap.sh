@@ -4,12 +4,12 @@
 # These are not actual git submodules, at least for now. They are still just
 # separate, independent repositories that are cloned here.
 LIBFLUID_BASE_SUBMODULE="libfluid_base"
-LIBFLUID_BASE_RELEASE="v0.1"
+LIBFLUID_BASE_RELEASE="master"
 
 LIBFLUID_MSG_SUBMODULE="libfluid_msg"
-LIBFLUID_MSG_RELEASE="v0.1"
+LIBFLUID_MSG_RELEASE="master"
 
-GIT_REPO="https://github.com/OpenNetworkingFoundation"
+GIT_REPO="https://github.com/hksoni"
 GIT_REPO_DEV="git@github.com:OpenNetworkingFoundation"
 
 # Utility functions

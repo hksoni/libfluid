@@ -44,7 +44,6 @@ loci_controller_debug:
 
 
 clean:
-	rm -f mc-agent
 	rm -f msg_controller
 	rm -f raw_controller
 	rm -f secure_controller
