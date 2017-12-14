@@ -21,7 +21,7 @@ MCGroupOpenFlowContext::MCGroupOpenFlowContext(MCGroup* mcg) {
 
 void MCGroupOpenFlowContext::add_bucket_of13_group(uint32_t xid, MCGroupMember* mtmg, uint8_t command) {
     ofgroupmod.xid(xid);
-    ofgroupmod.commmand(command);
+    ofgroupmod.command(command);
     ofgroupmod.group_type(of13::OFPGT_ALL);
     ofgroupmod.group_id(mcgroup->groupid_);
 
@@ -58,7 +58,7 @@ void MCGroupOpenFlowContext::add_bucket_of13_group(uint32_t xid, MCGroupMember* 
 
 void MCGroupOpenFlowContext::remove_bucket_of13_group(uint32_t xid, const MCGroupMember* mtmg, uint8_t command) {
     ofgroupmod.xid(xid);
-    ofgroupmod.commmand(command);
+    ofgroupmod.command(command);
     size_t bi = mtmg->bucket_index();
     std::cout<<__FUNCTION__<<":"<<__LINE__<<" Group ID : "<<mcgroup->groupid_<<"\n";
     std::cout<<__FUNCTION__<<":"<<__LINE__<<" Removing Group Member IP : "<<mtmg->dest_ip()<<"\n";
