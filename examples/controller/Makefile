@@ -1,7 +1,7 @@
 CC=cc
 CXX=c++
-RUN_FLAGS=-I. -O3 -std=c++0x
-DBG_FLAGS=-I. -g  -std=c++0x
+RUN_FLAGS=-I. -O3 -std=c++0x -lpthread
+DBG_FLAGS=-I. -g  -std=c++0x -lpthread
 
 all: msg_controller raw_controller  mc_controller
 all_for_reals: all loci_controller
